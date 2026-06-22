@@ -3,7 +3,7 @@ import argparse
 import os
 import sys
 from colorama import init, Fore, Style
-from dotenv import load_dotenv  # <-- Importamos dotenv
+from dotenv import load_dotenv
 
 # --- PARCHE DE RUTAS AUTOMÁTICO ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -11,13 +11,12 @@ if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
 # Cargamos el archivo .env automáticamente desde la raíz del proyecto
-# Busca el archivo .env un nivel arriba de la carpeta 'src'
 load_dotenv(os.path.join(BASE_DIR, '..', '.env'))
 
 from core.dissector import dissect_pcap
 from modules.web_rules import analyze_web_traffic
-# 🆕 Importamos el nuevo motor de firmas heurísticas para DNS
 from modules.dns_rules import analyze_dns_traffic
+from modules.icmp_rules import analyze_icmp_traffic # 🆕 Módulo ICMP
 from core.ai_engine import generate_threat_hypothesis
 
 init(autoreset=True)
@@ -55,11 +54,17 @@ def main():
         web_alerts = analyze_web_traffic(channels["HTTP"], max_requests_per_sec=20)
         all_alerts.extend(web_alerts)
         
-    # 🆕 --- Canal DNS ---
+    # --- Canal DNS ---
     if "DNS" in channels:
         print(f"{Fore.YELLOW}[*] Analizando anomalías en Canal DNS...{Style.RESET_ALL}")
         dns_alerts = analyze_dns_traffic(channels["DNS"], max_queries_per_sec=15)
         all_alerts.extend(dns_alerts)
+
+    # --- Canal ICMP ---
+    if "ICMP" in channels:
+        print(f"{Fore.YELLOW}[*] Analizando anomalías en Canal ICMP...{Style.RESET_ALL}")
+        icmp_alerts = analyze_icmp_traffic(channels["ICMP"])
+        all_alerts.extend(icmp_alerts)
         
     # 3. Reporte Local de Python
     print(f"\n{Fore.WHITE}=== REPORTE DE ANOMALÍAS DE PYTHON ==={Style.RESET_ALL}")
@@ -67,7 +72,7 @@ def main():
         print(f"{Fore.GREEN}[+] No se detectaron anomalías estructurales en los canales.{Style.RESET_ALL}")
     else:
         for alert in all_alerts:
-            # Sincronización visual de colores según criticidad
+            # Lógica de colores según severidad
             if alert.get("severity") == "CRÍTICA":
                 color = Fore.RED + Style.BRIGHT
             elif alert.get("severity") == "ALTA":
