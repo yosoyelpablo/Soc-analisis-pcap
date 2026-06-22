@@ -63,7 +63,9 @@ def dissect_pcap(pcap_path):
                     # Traducimos de bytes a string ignorando caracteres extraños de payloads maliciosos
                     method = http_layer.Method.decode(errors='ignore') if http_layer.Method else "GET"
                     uri = http_layer.Path.decode(errors='ignore') if http_layer.Path else "/"
-                    user_agent = http_layer.Http_User_Agent.decode(errors='ignore') if http_layer.Http_User_Agent else "No Presente"
+                    
+                    # 🔄 CORREGIDO: Cambiado de Http_User_Agent a User_Agent
+                    user_agent = http_layer.User_Agent.decode(errors='ignore') if http_layer.User_Agent else "No Presente"
                 
                 # Extraemos el cuerpo de la petición (POST data, inyecciones, forms)
                 if pkt.haslayer('Raw'):
