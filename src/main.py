@@ -4,24 +4,17 @@ import os
 import sys
 from colorama import init, Fore, Style
 
-# Inicializar colores en la terminal
+# Importamos el desmembrador que acabamos de crear
+from core.dissector import dissect_pcap
+
 init(autoreset=True)
 
 def parse_arguments():
-    """Maneja los argumentos de la línea de comandos."""
     parser = argparse.ArgumentParser(
         description=f"{Fore.CYAN}DarkBear-Dissector: Framework modular de análisis de tráfico de red y triaje con IA.{Style.RESET_ALL}"
     )
-    parser.add_argument(
-        "-p", "--pcap", 
-        required=True, 
-        help="Ruta absoluta o relativa del archivo .pcap / .pcapng a analizar."
-    )
-    parser.add_argument(
-        "--ai", 
-        action="store_true", 
-        help="Activa el motor de Inteligencia Artificial para la formulación de hipótesis de ataque."
-    )
+    parser.add_argument("-p", "--pcap", required=True, help="Ruta del archivo .pcap")
+    parser.add_argument("--ai", action="store_true", help="Activa el motor de IA")
     return parser.parse_args()
 
 def main():
@@ -29,21 +22,26 @@ def main():
     
     print(f"\n{Fore.GREEN}[*] Iniciando DarkBear-Dissector...{Style.RESET_ALL}")
     
-    # Validar que el archivo exista
     if not os.path.exists(args.pcap):
         print(f"{Fore.RED}[X] Error: El archivo '{args.pcap}' no existe.{Style.RESET_ALL}")
         sys.exit(1)
         
     print(f"{Fore.BLUE}[+] Archivo cargado correctamente: {args.pcap}{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}[*] Desmembrando canales de tráfico...{Style.RESET_ALL}")
     
-    # ---------------------------------------------------------------------------
-    # PASO SIGUIENTE: Acá vamos a orquestar el flujo llamando a los módulos
-    # 1. dissector.py (Desmembramiento de canales)
-    # 2. modules/ (Reglas heurísticas de Python)
-    # 3. ai_engine.py (Si args.ai está activo, llama a Gemini)
-    # ---------------------------------------------------------------------------
+    # Ejecutar el desmembrador
+    channels, error = dissect_pcap(args.pcap)
     
-    print(f"{Fore.YELLOW}[!] Modo de IA: {'ACTIVADO' if args.ai else 'DESACTIVADO'}{Style.RESET_ALL}\n")
+    if error:
+        print(f"{Fore.RED}[X] {error}{Style.RESET_ALL}")
+        sys.exit(1)
+        
+    # Mostrar un resumen en consola de los canales encontrados
+    print(f"\n{Fore.GREEN}[+] Análisis de canales completado con éxito:{Style.RESET_ALL}")
+    for channel, pkts in channels.items():
+        print(f"  {Fore.CYAN}• Canal [{channel}]:{Style.RESET_ALL} {len(pkts)} paquetes detectados.")
+        
+    print(f"\n{Fore.YELLOW}[!] Modo de IA: {'ACTIVADO' if args.ai else 'DESACTIVADO'}{Style.RESET_ALL}\n")
 
 if __name__ == "__main__":
     main()
