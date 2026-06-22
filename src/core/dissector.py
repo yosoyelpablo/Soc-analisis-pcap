@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 from scapy.all import rdpcap, IP, TCP, UDP, ICMP
-# Importamos la capa HTTP para que Scapy sepa parsear esos encabezados automáticamente
+# Importamos la capa HTTP y DNS para que Scapy sepa parsear esos encabezados automáticamente
 try:
     from scapy.layers.http import HTTPRequest
 except ImportError:
     pass
+
+try:
+    from scapy.layers.dns import DNS, DNSQR
+except ImportError:
+    pass
+
 from collections import defaultdict
 
 def dissect_pcap(pcap_path):
@@ -32,12 +38,14 @@ def dissect_pcap(pcap_path):
         channel_name = "UNKNOWN"
         payload_len = 0
         
-        # --- NUEVOS CAMPOS PARA ANÁLISIS WEB PROFUNDO ---
+        # --- NUEVOS CAMPOS PARA ANÁLISIS WEB Y DNS PROFUNDO ---
         # Se inicializan por defecto para no romper los otros protocolos (DNS, ICMP, etc.)
         method = "UNKNOWN"
         uri = "/"
         user_agent = "No Presente"
         payload = ""
+        dns_qname = "N/A"  # 🆕 Inicialización para DNS
+        dns_qtype = 0      # 🆕 Inicialización para DNS
         
         # 1. Identificación Dinámica del Canal (Capa 4 + Aplicación)
         if pkt.haslayer(TCP):
@@ -79,6 +87,15 @@ def dissect_pcap(pcap_path):
             channel_name = well_known_ports.get(port, f"UDP/Port-{port}")
             payload_len = len(udp_layer.payload)
             
+            # 🚀 EXTRACCIÓN ESPECIAL SI ES TRÁFICO DNS
+            if channel_name == "DNS" or pkt.haslayer('DNS'):
+                channel_name = "DNS"
+                if pkt.haslayer('DNSQR'):  # DNS Query Record (Petición)
+                    dns_layer = pkt['DNSQR']
+                    # Decodificamos el dominio consultado (ej: google.com.)
+                    dns_qname = dns_layer.qname.decode(errors='ignore') if dns_layer.qname else "N/A"
+                    dns_qtype = dns_layer.qtype
+            
         elif pkt.haslayer(ICMP):
             channel_name = "ICMP"
             payload_len = len(pkt[ICMP].payload)
@@ -90,11 +107,14 @@ def dissect_pcap(pcap_path):
             "length": len(pkt),
             "payload_len": payload_len,
             "time": float(pkt.time),
-            # Enviamos estas llaves siempre. Si no es HTTP, irán con sus valores por defecto.
+            # Campos del protocolo HTTP
             "method": method,
             "uri": uri,
             "user_agent": user_agent,
-            "payload": payload
+            "payload": payload,
+            # Campos del protocolo DNS
+            "dns_qname": dns_qname,  # 🆕 Enviado al pipeline
+            "dns_qtype": dns_qtype   # 🆕 Enviado al pipeline
         }
         
         # Guardar el paquete procesado en su respectivo canal
