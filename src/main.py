@@ -16,6 +16,8 @@ load_dotenv(os.path.join(BASE_DIR, '..', '.env'))
 
 from core.dissector import dissect_pcap
 from modules.web_rules import analyze_web_traffic
+# 🆕 Importamos el nuevo motor de firmas heurísticas para DNS
+from modules.dns_rules import analyze_dns_traffic
 from core.ai_engine import generate_threat_hypothesis
 
 init(autoreset=True)
@@ -46,10 +48,18 @@ def main():
     
     # 2. Análisis de Heurística en Python
     all_alerts = []
+    
+    # --- Canal HTTP ---
     if "HTTP" in channels:
         print(f"{Fore.YELLOW}[*] Analizando firmas y anomalías en Canal HTTP...{Style.RESET_ALL}")
         web_alerts = analyze_web_traffic(channels["HTTP"], max_requests_per_sec=20)
         all_alerts.extend(web_alerts)
+        
+    # 🆕 --- Canal DNS ---
+    if "DNS" in channels:
+        print(f"{Fore.YELLOW}[*] Analizando anomalías en Canal DNS...{Style.RESET_ALL}")
+        dns_alerts = analyze_dns_traffic(channels["DNS"], max_queries_per_sec=15)
+        all_alerts.extend(dns_alerts)
         
     # 3. Reporte Local de Python
     print(f"\n{Fore.WHITE}=== REPORTE DE ANOMALÍAS DE PYTHON ==={Style.RESET_ALL}")
@@ -57,8 +67,16 @@ def main():
         print(f"{Fore.GREEN}[+] No se detectaron anomalías estructurales en los canales.{Style.RESET_ALL}")
     else:
         for alert in all_alerts:
-            color = Fore.RED if alert["severity"] == "ALTA" else Fore.YELLOW
-            print(f"{color}[!] ALERT [{alert['type']}]{Style.RESET_ALL}")
+            # Sincronización visual de colores según criticidad
+            if alert.get("severity") == "CRÍTICA":
+                color = Fore.RED + Style.BRIGHT
+            elif alert.get("severity") == "ALTA":
+                color = Fore.RED
+            else:
+                color = Fore.YELLOW
+                
+            severity_str = f" ({alert['severity']})" if "severity" in alert else ""
+            print(f"{color}[!] ALERT [{alert['type']}]{severity_str}{Style.RESET_ALL}")
             print(f"    Origen Sospechoso: {alert['attacker']}")
             print(f"    Detalle: {alert['details']}\n")
 
