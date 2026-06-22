@@ -3,15 +3,20 @@ import argparse
 import os
 import sys
 from colorama import init, Fore, Style
+from dotenv import load_dotenv  # <-- Importamos dotenv
 
 # --- PARCHE DE RUTAS AUTOMÁTICO ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
-# Importación corregida de forma limpia
+# Cargamos el archivo .env automáticamente desde la raíz del proyecto
+# Busca el archivo .env un nivel arriba de la carpeta 'src'
+load_dotenv(os.path.join(BASE_DIR, '..', '.env'))
+
 from core.dissector import dissect_pcap
 from modules.web_rules import analyze_http_rate
+from core.ai_engine import generate_threat_hypothesis
 
 init(autoreset=True)
 
@@ -39,16 +44,14 @@ def main():
         
     print(f"{Fore.GREEN}[+] Canales desmembrados con éxito.{Style.RESET_ALL}")
     
-    # --- ANÁLISIS DE HEURÍSTICA EN PYTHON ---
+    # 2. Análisis de Heurística en Python
     all_alerts = []
-    
-    # Si el desmembrador encontró tráfico HTTP, lo analizamos con nuestro módulo
     if "HTTP" in channels:
         print(f"{Fore.YELLOW}[*] Analizando firmas y anomalías en Canal HTTP...{Style.RESET_ALL}")
         web_alerts = analyze_http_rate(channels["HTTP"], max_requests_per_sec=20)
         all_alerts.extend(web_alerts)
         
-    # 2. Mostrar Alertas de Python en Consola
+    # 3. Reporte Local de Python
     print(f"\n{Fore.WHITE}=== REPORTE DE ANOMALÍAS DE PYTHON ==={Style.RESET_ALL}")
     if not all_alerts:
         print(f"{Fore.GREEN}[+] No se detectaron anomalías estructurales en los canales.{Style.RESET_ALL}")
@@ -57,10 +60,16 @@ def main():
             color = Fore.RED if alert["severity"] == "ALTA" else Fore.YELLOW
             print(f"{color}[!] ALERT [{alert['type']}]{Style.RESET_ALL}")
             print(f"    Origen Sospechoso: {alert['attacker']}")
-            print(f"    Detalle: {alert['details']}")
-            print(f"    Severidad: {alert['severity']}\n")
+            print(f"    Detalle: {alert['details']}\n")
 
-    print(f"{Fore.YELLOW}[!] Modo de IA: {'ACTIVADO' if args.ai else 'DESACTIVADO'}{Style.RESET_ALL}\n")
+    # 4. Motor de Inteligencia Artificial
+    if args.ai:
+        print(f"{Fore.CYAN}=== INICIANDO TRIAJE CON INTELIGENCIA ARTIFICIAL ==={Style.RESET_ALL}")
+        hypothesis = generate_threat_hypothesis(channels, all_alerts)
+        print(f"\n{Fore.MAGENTA}🤖 HIPÓTESIS DEL ANALISTA DE IA:{Style.RESET_ALL}")
+        print(hypothesis)
+    else:
+        print(f"{Fore.YELLOW}[!] Modo de IA desactivado. Usá '--ai' para generar una hipótesis con Gemini.{Style.RESET_ALL}\n")
 
 if __name__ == "__main__":
     main()
