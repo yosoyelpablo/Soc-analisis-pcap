@@ -15,7 +15,7 @@ if BASE_DIR not in sys.path:
 load_dotenv(os.path.join(BASE_DIR, '..', '.env'))
 
 from core.dissector import dissect_pcap
-from modules.web_rules import analyze_http_rate
+from modules.web_rules import analyze_web_traffic
 from core.ai_engine import generate_threat_hypothesis
 
 init(autoreset=True)
@@ -48,7 +48,7 @@ def main():
     all_alerts = []
     if "HTTP" in channels:
         print(f"{Fore.YELLOW}[*] Analizando firmas y anomalías en Canal HTTP...{Style.RESET_ALL}")
-        web_alerts = analyze_http_rate(channels["HTTP"], max_requests_per_sec=20)
+        web_alerts = analyze_web_traffic(channels["HTTP"], max_requests_per_sec=20)
         all_alerts.extend(web_alerts)
         
     # 3. Reporte Local de Python
