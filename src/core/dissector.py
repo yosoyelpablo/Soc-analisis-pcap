@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from scapy.all import rdpcap, IP, TCP, UDP, ICMP
-# Importamos la capa HTTP y DNS para que Scapy sepa parsear esos encabezados automáticamente
+# Importamos las capas necesarias para el parseo automático
 try:
     from scapy.layers.http import HTTPRequest
 except ImportError:
@@ -18,17 +18,14 @@ def dissect_pcap(pcap_path):
     Lee un archivo PCAP/PCAPNG y clasifica los paquetes de forma 100% dinámica
     en diferentes canales basados en protocolos de red y puertos de aplicación.
     """
-    # Usamos defaultdict para que cree canales dinámicamente a medida que aparezcan
     traffic_channels = defaultdict(list)
     
     try:
-        # rdpcap carga el pcap para poder iterarlo
         packets = rdpcap(pcap_path)
     except Exception as e:
         return None, f"Error crítico al leer el archivo de red: {str(e)}"
 
     for pkt in packets:
-        # Filtrar solo tráfico IP por el momento (Capa 3)
         if not pkt.haslayer(IP):
             continue
             
@@ -38,22 +35,20 @@ def dissect_pcap(pcap_path):
         channel_name = "UNKNOWN"
         payload_len = 0
         
-        # --- NUEVOS CAMPOS PARA ANÁLISIS WEB Y DNS PROFUNDO ---
-        # Se inicializan por defecto para no romper los otros protocolos (DNS, ICMP, etc.)
+        # --- CAMPOS POR DEFECTO ---
         method = "UNKNOWN"
         uri = "/"
         user_agent = "No Presente"
         payload = ""
-        dns_qname = "N/A"  # 🆕 Inicialización para DNS
-        dns_qtype = 0      # 🆕 Inicialización para DNS
+        dns_qname = "N/A"
+        dns_qtype = 0
+        icmp_type = -1     # 🆕 Campo ICMP
+        icmp_code = -1     # 🆕 Campo ICMP
         
-        # 1. Identificación Dinámica del Canal (Capa 4 + Aplicación)
+        # 1. Identificación Dinámica del Canal
         if pkt.haslayer(TCP):
             tcp_layer = pkt[TCP]
-            # Tomamos el puerto menor asumiendo que es el puerto del servicio remoto
             port = min(tcp_layer.sport, tcp_layer.dport)
-            
-            # Mapeo de puertos comunes para etiquetar el canal con nombre
             well_known_ports = {
                 21: "FTP", 22: "SSH", 23: "TELNET", 25: "SMTP", 
                 80: "HTTP", 143: "IMAP", 443: "HTTPS", 445: "SMB", 
@@ -62,62 +57,56 @@ def dissect_pcap(pcap_path):
             channel_name = well_known_ports.get(port, f"TCP/Port-{port}")
             payload_len = len(tcp_layer.payload)
             
-            # 🚀 EXTRACCIÓN ESPECIAL SI ES TRÁFICO WEB (HTTP)
             if channel_name == "HTTP" or pkt.haslayer('HTTPRequest'):
-                channel_name = "HTTP" # Forzamos el nombre por si entró por inspección de capa
-                
+                channel_name = "HTTP"
                 if pkt.haslayer('HTTPRequest'):
                     http_layer = pkt['HTTPRequest']
-                    # Traducimos de bytes a string ignorando caracteres extraños de payloads maliciosos
                     method = http_layer.Method.decode(errors='ignore') if http_layer.Method else "GET"
                     uri = http_layer.Path.decode(errors='ignore') if http_layer.Path else "/"
-                    
-                    # 🔄 CORREGIDO: Cambiado de Http_User_Agent a User_Agent
                     user_agent = http_layer.User_Agent.decode(errors='ignore') if http_layer.User_Agent else "No Presente"
-                
-                # Extraemos el cuerpo de la petición (POST data, inyecciones, forms)
                 if pkt.haslayer('Raw'):
                     payload = pkt['Raw'].load.decode(errors='ignore')
             
         elif pkt.haslayer(UDP):
             udp_layer = pkt[UDP]
             port = min(udp_layer.sport, udp_layer.dport)
-            
             well_known_ports = {53: "DNS", 67: "DHCP", 68: "DHCP", 161: "SNMP"}
             channel_name = well_known_ports.get(port, f"UDP/Port-{port}")
             payload_len = len(udp_layer.payload)
             
-            # 🚀 EXTRACCIÓN ESPECIAL SI ES TRÁFICO DNS
             if channel_name == "DNS" or pkt.haslayer('DNS'):
                 channel_name = "DNS"
-                if pkt.haslayer('DNSQR'):  # DNS Query Record (Petición)
+                if pkt.haslayer('DNSQR'):
                     dns_layer = pkt['DNSQR']
-                    # Decodificamos el dominio consultado (ej: google.com.)
                     dns_qname = dns_layer.qname.decode(errors='ignore') if dns_layer.qname else "N/A"
                     dns_qtype = dns_layer.qtype
             
         elif pkt.haslayer(ICMP):
             channel_name = "ICMP"
-            payload_len = len(pkt[ICMP].payload)
+            icmp_layer = pkt[ICMP]
+            icmp_type = icmp_layer.type
+            icmp_code = icmp_layer.code
+            payload_len = len(icmp_layer.payload)
+            if pkt.haslayer('Raw'):
+                payload = pkt['Raw'].load.decode(errors='ignore')
         
-        # 2. Extracción de Metadatos (Estructura expandida compatible con la IA y reglas)
+        # 2. Extracción de Metadatos
         packet_meta = {
             "src": src_ip,
             "dst": dst_ip,
             "length": len(pkt),
             "payload_len": payload_len,
             "time": float(pkt.time),
-            # Campos del protocolo HTTP
             "method": method,
             "uri": uri,
             "user_agent": user_agent,
             "payload": payload,
-            # Campos del protocolo DNS
-            "dns_qname": dns_qname,  # 🆕 Enviado al pipeline
-            "dns_qtype": dns_qtype   # 🆕 Enviado al pipeline
+            "dns_qname": dns_qname,
+            "dns_qtype": dns_qtype,
+            "icmp_type": icmp_type,  # 🆕
+            "icmp_code": icmp_code   # 🆕
         }
         
-        # Guardar el paquete procesado en su respectivo canal
         traffic_channels[channel_name].append(packet_meta)
         
     return dict(traffic_channels), None
