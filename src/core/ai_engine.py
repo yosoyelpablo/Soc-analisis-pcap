@@ -1,57 +1,36 @@
 #!/usr/bin/env python3
 import os
-from google import genai
-from google.genai import errors
-from colorama import Fore, Style
+import google.generativeai as genai
 
-def generate_threat_hypothesis(channels_summary, python_alerts):
+def generate_threat_hypothesis(channels, alerts):
+    # Configurar API Key desde entorno
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "[!] Error: GEMINI_API_KEY no configurada en .env"
+    
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    # Preparar el contexto para la IA
+    alert_summary = "\n".join([f"- {a['type']} (Severidad: {a['severity']}): {a['details']}" for a in alerts])
+    
+    prompt = f"""
+    Actúa como un Analista de Ciberseguridad Senior de un SOC. Analiza las siguientes alertas detectadas en tráfico de red:
+    
+    {alert_summary}
+    
+    Tu salida debe seguir estrictamente este formato:
+    
+    1. **MATRIZ MITRE ATT&CK**: Mapea las alertas a tácticas conocidas (ej: Reconnaissance, Command and Control, Exfiltration).
+    2. **CALIFICACIÓN DE RIESGO**: Asigna un score de 0 a 10 y justifica brevemente.
+    3. **ANÁLISIS DE HIPÓTESIS**: Explica la correlación de eventos (¿Es un ataque coordinado? ¿Hay cortinas de humo?).
+    4. **PLAN DE ACCIÓN**: Enumera 3 medidas de contención prioritarias (Prioridad Alta, Media, Baja).
+    
+    Sé conciso, técnico y directo.
     """
-    Se conecta con la API de Gemini para generar una hipótesis de amenaza
-    basada en el desmembramiento de canales y alertas previas de Python.
-    """
-    if not os.environ.get("GEMINI_API_KEY"):
-        return f"{Fore.RED}[X] Error: La variable de entorno GEMINI_API_KEY no está configurada.{Style.RESET_ALL}"
 
     try:
-        # Inicializamos el cliente oficial de google-genai
-        client = genai.Client()
-        
-        # Formateamos la data para el modelo
-        channels_text = "\n".join([f"- Canal [{k}]: {len(v)} paquetes" for k, v in channels_summary.items()])
-        alerts_text = "\n".join([f"- {a['type']} de la IP {a['attacker']} ({a['details']})" for a in python_alerts]) if python_alerts else "Ninguna alerta estructural gatillada por Python."
-
-        # Construimos un prompt de rol estricto para perfil SOC/Blue Team
-        prompt = f"""
-        Actúa como un Ingeniero Principal de un SOC (Security Operations Center) y experto en Análisis de Tráfico de Red.
-        Se ha procesado una captura de tráfico (.pcap) y el script heurístico ha extraído los siguientes datos:
-
-        DISTRIBUCIÓN DE CANALES DETECTADOS:
-        {channels_text}
-
-        ALERTAS PREVIAS DETECTADAS POR PYTHON:
-        {alerts_text}
-
-        TAREA:
-        Por favor, analiza la relación entre el volumen de los canales y las alertas. Formula una hipótesis técnica, concisa y profesional sobre lo que podría estar ocurriendo en la red (ej. Exfiltración de datos, navegación normal, escaneo sigiloso, actividad C2, uso de protocolos modernos como QUIC, etc.). Incluye:
-        1. Resumen del Análisis de Tráfico.
-        2. Hipótesis de Amenaza (¿Qué crees que pasa?).
-        3. Próximos pasos recomendados para el analista.
-        
-        Devuelve tu respuesta formateada en Markdown limpio, directo al grano, sin introducciones corporativas ni saludos.
-        """
-
-        print(f"{Fore.BLUE}[*] Enviando telemetría a Gemini para triaje avanzado...{Style.RESET_ALL}")
-        
-        # --- CORRECCIÓN DE MODELO ---
-        # Cambiamos al identificador de la nueva generación estable del SDK
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        
+        response = model.generate_content(prompt)
         return response.text
-
-    except errors.APIError as e:
-        return f"{Fore.RED}[X] Error de API de Gemini: {str(e)}{Style.RESET_ALL}"
     except Exception as e:
-        return f"{Fore.RED}[X] Error inesperado en el motor de IA: {str(e)}{Style.RESET_ALL}"
+        return f"Error al consultar con Gemini: {str(e)}"
