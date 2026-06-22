@@ -9,7 +9,6 @@ def generate_threat_hypothesis(channels_summary, python_alerts):
     Se conecta con la API de Gemini para generar una hipótesis de amenaza
     basada en el desmembramiento de canales y alertas previas de Python.
     """
-    # El SDK busca automáticamente la variable de entorno GEMINI_API_KEY
     if not os.environ.get("GEMINI_API_KEY"):
         return f"{Fore.RED}[X] Error: La variable de entorno GEMINI_API_KEY no está configurada.{Style.RESET_ALL}"
 
@@ -43,9 +42,10 @@ def generate_threat_hypothesis(channels_summary, python_alerts):
 
         print(f"{Fore.BLUE}[*] Enviando telemetría a Gemini para triaje avanzado...{Style.RESET_ALL}")
         
-        # Llamamos al modelo estable y rápido para análisis de texto
+        # --- CORRECCIÓN DE MODELO ---
+        # Cambiamos al identificador de la nueva generación estable del SDK
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt,
         )
         
