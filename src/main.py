@@ -9,16 +9,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
+# Importación corregida de forma limpia
 from core.dissector import dissect_pcap
-# Importamos el nuevo módulo heurístico web
-from modules.web_rules.py_o_directo import analyze_http_rate 
-# Nota: Como está en la misma carpeta sys.path, importamos directo:
 from modules.web_rules import analyze_http_rate
 
 init(autoreset=True)
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="DarkBear-Dissector")
+    parser = argparse.ArgumentParser(
+        description=f"{Fore.CYAN}DarkBear-Dissector: Framework modular de análisis de tráfico de red y triaje con IA.{Style.RESET_ALL}"
+    )
     parser.add_argument("-p", "--pcap", required=True, help="Ruta del archivo .pcap")
     parser.add_argument("--ai", action="store_true", help="Activa el motor de IA")
     return parser.parse_args()
@@ -31,7 +31,7 @@ def main():
         print(f"{Fore.RED}[X] Error: El archivo '{args.pcap}' no existe.{Style.RESET_ALL}")
         sys.exit(1)
         
-    # 1. Desmembramiento
+    # 1. Desmembramiento de canales
     channels, error = dissect_pcap(args.pcap)
     if error:
         print(f"{Fore.RED}[X] {error}{Style.RESET_ALL}")
@@ -39,10 +39,10 @@ def main():
         
     print(f"{Fore.GREEN}[+] Canales desmembrados con éxito.{Style.RESET_ALL}")
     
-    # --- CORRECCIÓN/ANÁLISIS DE HEURÍSTICA EN PYTHON ---
+    # --- ANÁLISIS DE HEURÍSTICA EN PYTHON ---
     all_alerts = []
     
-    # Si el desmembrador encontró tráfico HTTP, lo analizamos
+    # Si el desmembrador encontró tráfico HTTP, lo analizamos con nuestro módulo
     if "HTTP" in channels:
         print(f"{Fore.YELLOW}[*] Analizando firmas y anomalías en Canal HTTP...{Style.RESET_ALL}")
         web_alerts = analyze_http_rate(channels["HTTP"], max_requests_per_sec=20)
