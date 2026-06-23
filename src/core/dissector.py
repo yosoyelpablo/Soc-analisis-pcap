@@ -42,8 +42,8 @@ def dissect_pcap(pcap_path):
         payload = ""
         dns_qname = "N/A"
         dns_qtype = 0
-        icmp_type = -1     # 🆕 Campo ICMP
-        icmp_code = -1     # 🆕 Campo ICMP
+        icmp_type = -1     # Campo ICMP
+        icmp_code = -1     # Campo ICMP
         
         # 1. Identificación Dinámica del Canal
         if pkt.haslayer(TCP):
@@ -90,7 +90,7 @@ def dissect_pcap(pcap_path):
             if pkt.haslayer('Raw'):
                 payload = pkt['Raw'].load.decode(errors='ignore')
         
-        # 2. Extracción de Metadatos
+        # 2. Extracción de Metadatos (Incluye el identificador de canal original)
         packet_meta = {
             "src": src_ip,
             "dst": dst_ip,
@@ -103,8 +103,9 @@ def dissect_pcap(pcap_path):
             "payload": payload,
             "dns_qname": dns_qname,
             "dns_qtype": dns_qtype,
-            "icmp_type": icmp_type,  # 🆕
-            "icmp_code": icmp_code   # 🆕
+            "icmp_type": icmp_type,  
+            "icmp_code": icmp_code,  
+            "_channel": channel_name  # 🆕 Metadato clave para la correlación de access_rules
         }
         
         traffic_channels[channel_name].append(packet_meta)
