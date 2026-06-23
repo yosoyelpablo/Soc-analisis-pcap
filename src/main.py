@@ -17,6 +17,7 @@ from core.dissector import dissect_pcap
 from modules.web_rules import analyze_web_traffic
 from modules.dns_rules import analyze_dns_traffic
 from modules.icmp_rules import analyze_icmp_traffic # 🆕 Módulo ICMP
+from modules.access_rules import analyze_access_traffic # 🆕 Módulo de Fuerza Bruta SSH/FTP
 from core.ai_engine import generate_threat_hypothesis
 
 init(autoreset=True)
@@ -65,6 +66,21 @@ def main():
         print(f"{Fore.YELLOW}[*] Analizando anomalías en Canal ICMP...{Style.RESET_ALL}")
         icmp_alerts = analyze_icmp_traffic(channels["ICMP"])
         all_alerts.extend(icmp_alerts)
+        
+    # --- Canales de Acceso (SSH / FTP) --- 🆕
+    access_packets = []
+    if "SSH" in channels: access_packets.extend(channels["SSH"])
+    if "FTP" in channels: access_packets.extend(channels["FTP"])
+    
+    # Correlación cruzada por si entraron etiquetados por puerto genérico TCP
+    for channel_name, pkts in channels.items():
+        if "Port-21" in channel_name or "Port-22" in channel_name:
+            access_packets.extend(pkts)
+            
+    if access_packets:
+        print(f"{Fore.YELLOW}[*] Analizando intentos de Fuerza Bruta en Canales SSH/FTP...{Style.RESET_ALL}")
+        access_alerts = analyze_access_traffic(access_packets, max_attempts_per_window=12, window_size=3.0)
+        all_alerts.extend(access_alerts)
         
     # 3. Reporte Local de Python
     print(f"\n{Fore.WHITE}=== REPORTE DE ANOMALÍAS DE PYTHON ==={Style.RESET_ALL}")
