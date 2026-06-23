@@ -9,7 +9,7 @@ def generate_threat_hypothesis(channels, alerts):
         return "[!] Error: GEMINI_API_KEY no configurada en .env"
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     # Preparar el contexto para la IA
     alert_summary = "\n".join([f"- {a['type']} (Severidad: {a['severity']}): {a['details']}" for a in alerts])
