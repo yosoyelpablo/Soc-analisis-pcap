@@ -74,7 +74,7 @@ pip install -r requirements.txt
 ### 3. Configurar variables de entorno
 Crea un archivo `.env` en la raíz del proyecto basándote en la plantilla `.env.example`:
 ```env
-GEMINI_API_KEY=AIzaSyTuClaveRealAquiDeGoogleAIStudio
+GEMINI_API_KEY=Su-clave-api-sacada-de-google-ai-studio
 ```
 
 ---
